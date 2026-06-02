@@ -240,8 +240,6 @@ class OneflowSDK {
 	 * @return mixed
 	 */
 	public function request($method, $path, $jsonData=null, $optional_headers = null) {
-		ini_set("track_errors","on");
-
 		$timestamp = time();
 		$url = $this->url.$path;
 		$urlParts = parse_url($url);
@@ -279,10 +277,14 @@ class OneflowSDK {
 				throw new Exception("Problem creating stream from $url, \n\t".implode("\n\t", error_get_last()));
 			}
 			
+			$meta = stream_get_meta_data($fp);
 			$response = stream_get_contents($fp);
-			if ($response === false)	throw new Exception("Problem reading data from $url, $php_errormsg");
+			if ($response === false)	{
+				$lastError = error_get_last();
+				throw new Exception("Problem reading data from $url, ".($lastError['message'] ?? ''));
+			}
 
-			preg_match('{HTTP\/\S*\s(\d{3})}', $http_response_header[0], $match);
+			preg_match('{HTTP\/\S*\s(\d{3})}', $meta['wrapper_data'][0], $match);
 			$status = $match[1];
 
 			if (!call_user_func($this->retryCondition, $status, $method, $path)) break;
@@ -416,7 +418,10 @@ class OneflowSDK {
 		if (!$fp)					throw new Exception("PROBLEM:\n".implode("\n\t", error_get_last())."\n\n\n\n");
 
 		$response = stream_get_contents($fp);
-		if ($response === false) 	throw new Exception("Problem reading data from $uploadUrl, $php_errormsg");
+		if ($response === false) 	{
+			$lastError = error_get_last();
+			throw new Exception("Problem reading data from $uploadUrl, ".($lastError['message'] ?? ''));
+		}
 
 		return $response;
 	}
